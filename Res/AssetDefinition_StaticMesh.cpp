@@ -230,7 +230,7 @@ namespace MenuExtension_StaticMesh
 		uint32 maxBVHDepth = 0;
 		uint32 pageStreamingStatesNum=inNaniteMesh->PageStreamingStates.Num();
 		uint32 hierarchyNodesNum=inNaniteMesh->HierarchyNodes.Num();
-		FILE*pFile=fopen("F:/SourceCodes/Direct3D12/Tutorials/NaniteRendering/Nanite/Res/Data/HierarchyBuffer.data","wb");
+		FILE*pFile=fopen("D:/HierarchyBuffer.data","wb");
 		for(uint32 i=0;i<hierarchyNodesNum;i++){
 			const Nanite::FPackedHierarchyNode& packedHierarchyNode=inNaniteMesh->HierarchyNodes[i];
 			fwrite(&packedHierarchyNode,1,sizeof(packedHierarchyNode),pFile);
