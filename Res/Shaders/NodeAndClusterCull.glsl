@@ -100,6 +100,11 @@ FHierarchyNodeSlice GetHierarchyNodeSlice(uint NodeIndex, uint ChildIndex)
 	return UnpackHierarchyNodeSlice(RawData0, RawData1, RawData2, RawData3);
 }
 
+bool ShouldVisitChild(FHierarchyNodeSlice inHierarchyNodeSlice){
+	//threshold,leaf,bvh index
+	return true;
+}
+
 void main()
 {
 	// pre 4 uint is Unreal to use | =>
@@ -107,21 +112,34 @@ void main()
 	uint nodeCount=CurrentWorkArgs.mData[6];
 
 	uint nextNodeOffsetInBuffer=nodeOffset+nodeCount;//index in MainAndPostNodeAndClusterBatches
-	uint offset=nextNodeOffsetInBuffer;
+	uint nodeOutputOffset=nextNodeOffsetInBuffer;
 	uint nextNodeCount=0;//next level bvh node count;
+
+	uint clusterOutputOffset=CurrentWorkArgs.mData[7];
 	for(int nodeIndexOffset=0;nodeIndexOffset<nodeCount;nodeIndexOffset++){
 		uint currentNodeIndex=MainAndPostNodeAndClusterBatches.mData[nodeOffset+nodeIndexOffset];
 		for(int i=0;i<4;i++){
 			FHierarchyNodeSlice slice=GetHierarchyNodeSlice(currentNodeIndex,i);
 			if(slice.bEnabled){
+				bool bShouldVisitChild=ShouldVisitChild(slice);
 				if(false==slice.bLeaf){
-					MainAndPostNodeAndClusterBatches.mData[offset]=slice.ChildStartReference;
-					offset++;
+					MainAndPostNodeAndClusterBatches.mData[nodeOutputOffset]=slice.ChildStartReference;
+					nodeOutputOffset++;
 					nextNodeCount++;
+				}else{
+					uint clusterCountInLeafNode=slice.NumChildren;//
+					uint pageIndex=slice.ChildStartReference>>8;
+					uint clusterOffsetInPage=slice.ChildStartReference & 0xFFu;
+					for(uint i=0u;i<clusterCountInLeafNode;i++){
+						MainAndPostNodeAndClusterBatches.mData[1024+clusterOutputOffset*2]=pageIndex;
+						MainAndPostNodeAndClusterBatches.mData[1024+clusterOutputOffset*2+1]=clusterOffsetInPage+i;
+						clusterOutputOffset++;
+					}
 				}
 			}
 		}
 	}
 	NextWorkArgs.mData[5]=nextNodeOffsetInBuffer;
 	NextWorkArgs.mData[6]=nextNodeCount;
+	NextWorkArgs.mData[7]=clusterOutputOffset;
 }

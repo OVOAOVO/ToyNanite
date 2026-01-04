@@ -47,7 +47,7 @@ void InitScene(int inCanvasWidth, int inCanvasHeight) {
 	
 	{
 		size_t fileSize = 0;
-		unsigned char* fileContent = LoadFileContent("Res/HierarchyBuffer.data", fileSize);
+		unsigned char* fileContent = LoadFileContent("Res/mitsuba.bvh", fileSize);
 		sBVHBuffer = GenBufferObject(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
 			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, fileContent, fileSize);
 		delete[] fileContent;

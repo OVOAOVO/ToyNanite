@@ -13,9 +13,8 @@ layout(std430,binding=2)buffer FMainAndPostNodeAndClusterBatches{
 void main(){
 	WorkArgs0.mData[5]=0u;
 	WorkArgs0.mData[6]=1u;
+	WorkArgs0.mData[7]=0u;
 	WorkArgs1.mData[5]=0u;
 	WorkArgs1.mData[6]=1u;
-	for(int i=0;i<128;i++){
-		MainAndPostNodeAndClusterBatches.mData[i]=0;
-	}
+	WorkArgs1.mData[7]=0u;
 }
