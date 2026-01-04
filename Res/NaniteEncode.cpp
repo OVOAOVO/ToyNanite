@@ -4651,7 +4651,7 @@ void Encode(
 	}
 	{
 		TArray<FPackedHierarchyNode> clonedBVHData(Resources.HierarchyNodes);
-		std::string outputPath="F:/SourceCodes/Direct3D12/Tutorials/NaniteRendering/Nanite/Res/Data";
+		std::string outputPath="D:/ToyNanite/Res";
 		std::string naniteMeshBVHPath=outputPath+"/mitsuba.bvh";
 		std::string naniteMeshDataPath=outputPath+"/mitsuba.nanitemesh";
 		std::vector<uint32> pageDataOffsets;
