@@ -29,6 +29,14 @@ layout(std430,binding=3)buffer FWorkArgs0{
 layout(std430,binding=4)buffer FWorkArgs1{
     uint mData[];
 }NextWorkArgs;
+layout(binding=5)uniform GlobalConstants {
+	mat4 mProjectionMatrix;
+	mat4 mViewMatrix;//View => translate
+	mat4 mModelMatrix;
+	uvec4 mMisc0;//0xFFFFFFFFu
+	vec4 mNanite_ViewOrigin;//x,y,z,w => lodScale
+	vec4 mNanite_ViewForward;//x,y,z,w => lodScaleHW
+};
 uint BitFieldExtractU32(uint Data, uint Size, uint Offset)
 {
 	// Shift amounts are implicitly &31 in HLSL, so they should be optimized away on most platforms

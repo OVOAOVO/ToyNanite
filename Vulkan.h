@@ -13,11 +13,11 @@ struct GlobalConstants {
 	union {
 		struct {
 			float mProjectionMatrix[16];
-			float mViewMatrix[16];
+			float mViewMatrix[16];//view -> null translate
 			float mModelMatrix[16];
 			unsigned int mMisc0[4];//0xFFFFFFFFu
-			float mCameraPositionWS[4];
-			float mViewDirectionWS[4];
+			float mCameraPositionWS[4];//x,y,z,(w lodscale)
+			float mViewDirectionWS[4];//x,y,z,(w lodscale for hard/soft rasterize)
 		};
 		float mData[1024];
 	};
