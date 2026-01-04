@@ -7,6 +7,10 @@
 #include "StaticMesh.h"
 #include "SceneNode.h"
 #define _4MB 4194304
+
+static Buffer* sBVHBuffer, *sEchoBuffer;
+static RenderPass* sInitPass;
+
 unsigned char* LoadFileContent(const char* inFilePath, size_t& outFileSize) {
 	FILE* file = nullptr;
 	errno_t err = fopen_s(&file, inFilePath, "rb");
@@ -22,9 +26,30 @@ unsigned char* LoadFileContent(const char* inFilePath, size_t& outFileSize) {
 	return fileContent;
 }
 void InitScene(int inCanvasWidth, int inCanvasHeight) {
+	sEchoBuffer = GenBufferObject(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, nullptr, _4MB);
+	SetObjectName(VK_OBJECT_TYPE_BUFFER, sEchoBuffer->mBuffer, "EchoBuffer");
+	{
+		size_t fileSize = 0;
+		unsigned char* fileContent = LoadFileContent("Res/HierarchyBuffer.data", fileSize);
+		sBVHBuffer = GenBufferObject(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, fileContent, fileSize);
+		delete[] fileContent;
+		SetObjectName(VK_OBJECT_TYPE_BUFFER, sBVHBuffer->mBuffer, "HierarchyBuffer");
+	}
 
+	//InitPass ->(Unreal) RasterClear
+	{
+		sInitPass = new RenderPass(ERenderPassType::ERPT_COMPUTE, "Init");
+		sInitPass->SetSSBO(0, sBVHBuffer);
+		sInitPass->SetSSBO(1, sEchoBuffer, true);
+		sInitPass->SetCS("Res/Shaders/Init.spv");
+		sInitPass->SetComputeDispatchArgs(1, 1, 1);
+		sInitPass->Build();
+	}
 }
 void RenderOneFrame(float inFrameTimeInSecond) {
+	sInitPass->Execute();
 	VkCommandBuffer commandBuffer = CreateCommandBuffer();
 	BeginCommandBuffer(commandBuffer, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 	{
