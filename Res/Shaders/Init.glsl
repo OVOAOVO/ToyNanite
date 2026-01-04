@@ -17,9 +17,12 @@ layout(local_size_x=1,local_size_y=1,local_size_z=1)in;
 layout(std430,binding=0)buffer FBVHBuffer{
     uint mData[];
 }BVHBuffer;
-layout(std430,binding=0)buffer FEchoBuffer{
+layout(std430,binding=1)buffer FEchoBuffer{
     uint mData[];
 }EchoBuffer;
+layout(std430,binding=2)buffer FMainAndPostNodeAndClusterBatches{
+    uint mData[];
+}MainAndPostNodeAndClusterBatches;
 
 uint BitFieldExtractU32(uint Data, uint Size, uint Offset)
 {
@@ -95,27 +98,48 @@ FHierarchyNodeSlice GetHierarchyNodeSlice(uint NodeIndex, uint ChildIndex)
 void main()
 {
     uint offset = 0u;
-    for(int i = 0; i < 21; i++) // BVHBuffer Node Count
-    {
-        for(int j = 0;j < 4;j++) // branch tree 4
-        {
-            FHierarchyNodeSlice node = GetHierarchyNodeSlice(i,j);
-            EchoBuffer.mData[offset] = floatBitsToUint(float(i));
-            offset++;
-            EchoBuffer.mData[offset] = floatBitsToUint(float(j));
-            offset++;
-            EchoBuffer.mData[offset] = floatBitsToUint(node.LODBounds.x);
-            offset++;
-            EchoBuffer.mData[offset] = floatBitsToUint(node.BoxBoundsCenter.x);
-            offset++;
-            EchoBuffer.mData[offset] = floatBitsToUint(float(i));
-            offset++;
-            EchoBuffer.mData[offset] = floatBitsToUint(float(j));
-            offset++;
-            EchoBuffer.mData[offset] = floatBitsToUint(node.BoxBoundsExtent.x);
-            offset++;
-            EchoBuffer.mData[offset] = node.bLeaf?floatBitsToUint(1.0f):floatBitsToUint(0.0f);
-            offset++;
-        }
-    }
+
+	uint currentNodeIndex = 0;//index in bvh buffer : [208]
+	uint currentNodeOffsetInBuffer = 0;
+	uint currentNodeCount = 1;
+
+	uint nextNodeOffsetInBuffer = 0;//index in MainAndPostNodeAndClusterBatches
+	uint nextNodeCount = 0; // next level bvh node count;
+
+	while(true)
+	{
+		for(int i = 0; i < NANITE_MAX_BVH_NODE_FANOUT;i++)
+		{
+			FHierarchyNodeSlice slice = GetHierarchyNodeSlice(currentNodeIndex, i);
+			if(slice.bEnabled)
+			{
+				if(slice.bLeaf == false)
+				{
+					MainAndPostNodeAndClusterBatches.mData[offset] = slice.ChildStartReference;
+					offset++;
+					nextNodeCount++;
+				}
+			}
+		}
+		currentNodeCount--;
+		if(currentNodeCount == 0)
+		{
+			if(nextNodeCount == 0)
+			{
+				break;
+			}
+			currentNodeOffsetInBuffer = nextNodeOffsetInBuffer;
+			currentNodeCount = nextNodeCount;
+			nextNodeOffsetInBuffer = offset;
+			nextNodeCount = 0;
+
+			currentNodeIndex = MainAndPostNodeAndClusterBatches.mData[currentNodeOffsetInBuffer];
+			currentNodeOffsetInBuffer++;
+		}
+		else
+		{
+			currentNodeIndex = MainAndPostNodeAndClusterBatches.mData[currentNodeOffsetInBuffer];
+			currentNodeOffsetInBuffer++;
+		}
+	}
 }

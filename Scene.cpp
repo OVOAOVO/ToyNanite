@@ -8,7 +8,7 @@
 #include "SceneNode.h"
 #define _4MB 4194304
 
-static Buffer* sBVHBuffer, *sEchoBuffer;
+static Buffer* sBVHBuffer, *sEchoBuffer, *sMainAndPostNodeAndClusterBatches;
 static RenderPass* sInitPass;
 
 unsigned char* LoadFileContent(const char* inFilePath, size_t& outFileSize) {
@@ -28,7 +28,9 @@ unsigned char* LoadFileContent(const char* inFilePath, size_t& outFileSize) {
 void InitScene(int inCanvasWidth, int inCanvasHeight) {
 	sEchoBuffer = GenBufferObject(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
 		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, nullptr, _4MB);
-	SetObjectName(VK_OBJECT_TYPE_BUFFER, sEchoBuffer->mBuffer, "EchoBuffer");
+	sMainAndPostNodeAndClusterBatches = GenBufferObject(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, nullptr, _4MB);
+	SetObjectName(VK_OBJECT_TYPE_BUFFER, sMainAndPostNodeAndClusterBatches->mBuffer, "MainAndPostNodeAndClusterBatches");
 	{
 		size_t fileSize = 0;
 		unsigned char* fileContent = LoadFileContent("Res/HierarchyBuffer.data", fileSize);
@@ -41,8 +43,9 @@ void InitScene(int inCanvasWidth, int inCanvasHeight) {
 	//InitPass ->(Unreal) RasterClear
 	{
 		sInitPass = new RenderPass(ERenderPassType::ERPT_COMPUTE, "Init");
-		sInitPass->SetSSBO(0, sBVHBuffer);
+		sInitPass->SetSSBO(0, sBVHBuffer);//Shader Storage Buffer Object
 		sInitPass->SetSSBO(1, sEchoBuffer, true);
+		sInitPass->SetSSBO(2, sMainAndPostNodeAndClusterBatches, true);
 		sInitPass->SetCS("Res/Shaders/Init.spv");
 		sInitPass->SetComputeDispatchArgs(1, 1, 1);
 		sInitPass->Build();
