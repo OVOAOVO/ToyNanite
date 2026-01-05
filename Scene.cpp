@@ -221,6 +221,42 @@ void InitScene(int inCanvasWidth, int inCanvasHeight) {
 }
 
 void RenderOneFrame(float inFrameTimeInSecond) {
+	float speed = 400.0f;
+	float dt = inFrameTimeInSecond;
+
+	float worldUp[3] = { 0,1,0 };
+
+	// Right = normalize(cross(ViewDir, Up))
+	float right[3] = {
+		sGlobalConstantsData.mViewDirectionWS[1] * worldUp[2] -
+		sGlobalConstantsData.mViewDirectionWS[2] * worldUp[1],
+
+		sGlobalConstantsData.mViewDirectionWS[2] * worldUp[0] -
+		sGlobalConstantsData.mViewDirectionWS[0] * worldUp[2],
+
+		sGlobalConstantsData.mViewDirectionWS[0] * worldUp[1] -
+		sGlobalConstantsData.mViewDirectionWS[1] * worldUp[0],
+	};
+
+	float len = sqrtf(right[0] * right[0] + right[1] * right[1] + right[2] * right[2]);
+	right[0] /= len; right[1] /= len; right[2] /= len;
+
+	if (GetAsyncKeyState('W'))
+		for (int i = 0; i < 3; i++)
+			sGlobalConstantsData.mCameraPositionWS[i] += sGlobalConstantsData.mViewDirectionWS[i] * speed * dt;
+
+	if (GetAsyncKeyState('S'))
+		for (int i = 0; i < 3; i++)
+			sGlobalConstantsData.mCameraPositionWS[i] -= sGlobalConstantsData.mViewDirectionWS[i] * speed * dt;
+
+	if (GetAsyncKeyState('A'))
+		for (int i = 0; i < 3; i++)
+			sGlobalConstantsData.mCameraPositionWS[i] -= right[i] * speed * dt;
+
+	if (GetAsyncKeyState('D'))
+		for (int i = 0; i < 3; i++)
+			sGlobalConstantsData.mCameraPositionWS[i] += right[i] * speed * dt;
+
 	BufferSubData(sGlobalConstantsBuffer, &sGlobalConstantsData, sizeof(GlobalConstants));
 	sInitPass->Execute();
 	for (int i = 0; i < 4; i++) {
