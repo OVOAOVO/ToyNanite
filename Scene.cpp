@@ -22,9 +22,9 @@ static matrix4 sProjectionMatrix, sViewMatrix, sModelMatrix;
 static GlobalConstants sGlobalConstantsData;
 
 static Buffer* sGlobalConstantsBuffer,* sBVHBuffer, *sEchoBuffer, *sWorkArgsBuffer[2], * sMainAndPostNodeAndClusterBatches,
-				*sVisBuffer64, *sNaniteMesh, *sVisibleClusterSHWH;
+				*sVisBuffer64, *sNaniteMesh, *sVisiableClusterSHWH;
 static Texture2D* sVisualizationTexture;
-static RenderPass* sInitPass, *sNodeAndClusterCullPass[4], *sVisualizePass;
+static RenderPass* sInitPass, *sNodeAndClusterCullPass[4], *sClusterCullPass, *sHWRasterizePass, *sVisualizePass;
 static SceneNode* sFSQNode;
 unsigned char* LoadFileContent(const char* inFilePath, size_t& outFileSize) {
 	FILE* file = nullptr;
@@ -103,9 +103,9 @@ void InitScene(int inCanvasWidth, int inCanvasHeight) {
 		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, nullptr, _4MB);
 	SetObjectName(VK_OBJECT_TYPE_BUFFER, sMainAndPostNodeAndClusterBatches->mBuffer, "MainAndPostNodeAndClusterBatches");
 	
-	sVisibleClusterSHWH = GenBufferObject(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+	sVisiableClusterSHWH = GenBufferObject(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
 		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, nullptr, _4MB);
-	SetObjectName(VK_OBJECT_TYPE_BUFFER, sVisibleClusterSHWH->mBuffer, "VisibleClusterSHWH");
+	SetObjectName(VK_OBJECT_TYPE_BUFFER, sVisiableClusterSHWH->mBuffer, "VisiableClusterSHWH");
 
 	{
 		size_t fileSize = 0;
@@ -153,6 +153,16 @@ void InitScene(int inCanvasWidth, int inCanvasHeight) {
 		sNodeAndClusterCullPass[i]->Build();
 	}
 
+	//ClusterCull Pass
+	{
+		sClusterCullPass = new RenderPass(ERenderPassType::ERPT_COMPUTE, "ClusterCull");
+		sClusterCullPass->SetUniformBufferObject(0, sGlobalConstantsBuffer);
+		sClusterCullPass->SetSSBO(1, sMainAndPostNodeAndClusterBatches);
+		sClusterCullPass->SetSSBO(2, sVisiableClusterSHWH, true);
+		sClusterCullPass->SetCS("Res/Shaders/ClusterCull.spv");
+		sClusterCullPass->SetComputeDispatchArgs(1, 1, 1);
+		sClusterCullPass->Build();
+	}
 
 	//Visualize Pass
 	{
@@ -194,6 +204,7 @@ void RenderOneFrame(float inFrameTimeInSecond) {
 	for (int i = 0; i < 4; i++) {
 		sNodeAndClusterCullPass[i]->Execute();
 	}
+	sClusterCullPass->Execute();
 	sVisualizePass->Execute();
 	VkCommandBuffer commandBuffer = CreateCommandBuffer();
 	BeginCommandBuffer(commandBuffer, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
