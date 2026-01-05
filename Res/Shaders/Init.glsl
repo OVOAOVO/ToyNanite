@@ -35,5 +35,5 @@ void main(){
 		WorkArgs1.mData[6]=1u;
 	}
 	int pixelIndex=texcoord.y*1280+texcoord.x;
-	VisBuffer64.mData[pixelIndex]=pixelIndex;
+	VisBuffer64.mData[pixelIndex]=0xFFFFFFFF00000000ul;
 }

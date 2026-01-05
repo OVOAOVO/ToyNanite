@@ -40,13 +40,16 @@ void main(){
 
     int pixelIndex = texcoord.y*1280+texcoord.x;
     uint64_t pixelValue = VisBuffer64.mData[pixelIndex];// 32(depth) | 32( pageIndex | ClusterIndex)
-    uint packedClusterInfo = uint(pixelValue);
-    uint pageIndex = packedClusterInfo >> 8;
-    uint clusterIndex = packedClusterInfo & 0xFFu;
+	uint packedClusterInfo = uint(pixelValue);
+	vec3 color = vec3(0.f, 0.f, 0.f);
+	if(packedClusterInfo > 0)
+	{
+		uint pageIndex = packedClusterInfo >> 8;
+		uint clusterIndex = (packedClusterInfo & 0xFFu)-1;
 
-    vec3 color = vec3(0.f, 0.f, 0.f);
-    color = IntToColor(clusterIndex);
-    color = color * 0.8 + 0.2;
+		color = IntToColor(clusterIndex);
+		color = color * 0.8 + 0.2;
+	}
     imageStore(VisualizeTexture, texcoord, vec4(color, 1.f));
 
 }

@@ -26,6 +26,10 @@ static Buffer* sGlobalConstantsBuffer,* sBVHBuffer, *sEchoBuffer, *sWorkArgsBuff
 static Texture2D* sVisualizationTexture;
 static RenderPass* sInitPass, *sNodeAndClusterCullPass[4], *sClusterCullPass, *sHWRasterizePass, *sVisualizePass;
 static SceneNode* sFSQNode;
+
+static int sCurrentMipLevelIndex = 0;
+static int sAvaliableMipLevels[] = { 0 ,1, 2 ,3 ,4 ,5 ,6 ,7 ,8 ,9 ,10 };
+
 unsigned char* LoadFileContent(const char* inFilePath, size_t& outFileSize) {
 	FILE* file = nullptr;
 	errno_t err = fopen_s(&file, inFilePath, "rb");
@@ -57,7 +61,7 @@ void InitScene(int inCanvasWidth, int inCanvasHeight) {
 	sGlobalConstantsData.SetProjectionMatrix(sProjectionMatrix.v);
 	sGlobalConstantsData.SetViewMatrix(sViewMatrix.v);
 	sGlobalConstantsData.SetModelMatrix(sModelMatrix.v);
-	sGlobalConstantsData.SetMisc0(0, 0, 0, 0);
+	sGlobalConstantsData.SetMisc0(sAvaliableMipLevels[sCurrentMipLevelIndex], 0, 0, 0);
 
 	float4 viewDirection = sCameraTargetPositionWS - sCameraPositionWS;
 	viewDirection.Normalize();
@@ -248,13 +252,11 @@ void RenderOneFrame(float inFrameTimeInSecond) {
 
 void OnKeyUp(unsigned int inKeyCode)
 {
-	static int sCurrentMipLevelIndex = 0;
-	static int sAvaliableMipLevels[] = { 0 ,1, 2 ,3 ,4 ,5 ,6 ,7 ,8 ,9 ,10 };
 	if (inKeyCode == VK_UP)
 	{
 		printf("up arrow\n");
 		sCurrentMipLevelIndex++;
-		if (sCurrentMipLevelIndex == sizeof(sAvaliableMipLevels))
+		if (sCurrentMipLevelIndex == _countof(sAvaliableMipLevels))
 		{
 			sCurrentMipLevelIndex = 0;
 		}
@@ -265,7 +267,7 @@ void OnKeyUp(unsigned int inKeyCode)
 		sCurrentMipLevelIndex--;
 		if (sCurrentMipLevelIndex < 0)
 		{
-			sCurrentMipLevelIndex = sizeof(sAvaliableMipLevels) - 1;
+			sCurrentMipLevelIndex = _countof(sAvaliableMipLevels) - 1;
 		}
 	}
 	sGlobalConstantsData.SetMisc0(sAvaliableMipLevels[sCurrentMipLevelIndex], 0, 0, 0);

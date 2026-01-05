@@ -40,7 +40,7 @@ uint BitFieldExtractU32(uint Data, uint Size, uint Offset)
 }
 void main(){//
 	for(int i=0;i<932;i++){
-		VisibleClusterSHWH.mData[1024+i*2]=MainAndPostNodeAndClusterBatches.mData[1024+i*2];
-		VisibleClusterSHWH.mData[1024+i*2+1]=MainAndPostNodeAndClusterBatches.mData[1024+i*2+1];
+		VisibleClusterSHWH.mData[i*2]=MainAndPostNodeAndClusterBatches.mData[1024+i*2];
+		VisibleClusterSHWH.mData[i*2+1]=MainAndPostNodeAndClusterBatches.mData[1024+i*2+1];
 	}
 }
