@@ -35,7 +35,7 @@ layout(binding=5)uniform GlobalConstants {
 	uvec4 mMisc0;//0xFFFFFFFFu,x:Manual MipLevel
 	vec4 mNanite_ViewOrigin;//x,y,z,w => lodScale
 	vec4 mNanite_ViewForward;//x,y,z,w => lodScaleHW
-} U_GlobalContants;
+} U_GlobalConstants;
 uint BitFieldExtractU32(uint Data, uint Size, uint Offset)
 {
 	// Shift amounts are implicitly &31 in HLSL, so they should be optimized away on most platforms
@@ -101,9 +101,50 @@ FHierarchyNodeSlice GetHierarchyNodeSlice(uint NodeIndex, uint ChildIndex)
 	
 	return UnpackHierarchyNodeSlice(RawData0, RawData1, RawData2, RawData3);
 }
+vec2 GetProjectedEdgeScales(vec4 Bounds)
+{
+	if(U_GlobalConstants.mProjectionMatrix[3][3] >= 1.0f )
+	{
+		return vec2(1.0f, 1.0f);
+	}
+	vec3 Center = Bounds.xyz;
+	float Radius = Bounds.w;
+
+	float ZNear = 10.0f;
+	float DistToClusterSq = dot(Center,Center);	// camera origin in (0,0,0)
+	
+	float Z = dot(U_GlobalConstants.mNanite_ViewForward.xyz, Center);
+	float XSq = DistToClusterSq - Z * Z;
+	float X = sqrt( max(0.0f, XSq) );
+	float DistToTSq = DistToClusterSq - Radius * Radius;
+	float DistToT = sqrt( max(0.0f, DistToTSq) );
+	float ScaledCosTheta = DistToT;
+	float ScaledSinTheta = Radius;
+	float ScaleToUnit = 1.0f/ DistToClusterSq;
+	float By = (  ScaledSinTheta * X + ScaledCosTheta * Z ) * ScaleToUnit;
+	float Ty = ( -ScaledSinTheta * X + ScaledCosTheta * Z ) * ScaleToUnit;
+	
+	float MinZ = max( Z - Radius, ZNear );
+	float MaxZ = max( Z + Radius, ZNear );
+	float MinCosAngle = Ty;
+	float MaxCosAngle = By;
+
+	if(Z + Radius > ZNear)
+		return vec2( MinZ * MinCosAngle, MaxZ * MaxCosAngle );
+	else
+		return vec2( 0.0f, 0.0f );
+}
 bool ShouldVisitChild(FHierarchyNodeSlice inHierarchyNodeSlice){
-	//threshold,leaf,bvh index
-	return true;
+	vec4 boundingSphereWS=inHierarchyNodeSlice.LODBounds;
+	vec4 positionWS=U_GlobalConstants.mModelMatrix*vec4(boundingSphereWS.xyz,1.0f);
+	boundingSphereWS.xyz=positionWS.xyz-U_GlobalConstants.mNanite_ViewOrigin.xyz;
+	float lodScale=U_GlobalConstants.mNanite_ViewOrigin.w;
+	vec2 ProjectedEdgeScales = GetProjectedEdgeScales(boundingSphereWS);
+	float Threshold = lodScale * inHierarchyNodeSlice.MaxParentLODError;
+	if( ProjectedEdgeScales.x <= Threshold ){
+		return true;
+	}
+	return false;
 }
 void main(){//
 	//uint uint uint uint uint | => 
@@ -127,7 +168,9 @@ void main(){//
 					nodeOutputOffset++;
 					nextNodeCount++;
 				}else{
-					if(currentSliceMipLevel==U_GlobalContants.mMisc0.x){
+					//if(currentSliceMipLevel==U_GlobalConstants.mMisc0.x)
+					if(bShouldVisitChild)
+					{
 						uint clusterCountInLeafNode=slice.NumChildren;//
 						uint pageIndex=slice.ChildStartReference>>8;
 						uint clusterOffsetInPage=slice.ChildStartReference & 0xFFu;

@@ -164,6 +164,8 @@ void InitScene(int inCanvasWidth, int inCanvasHeight) {
 		sClusterCullPass->SetUniformBufferObject(0, sGlobalConstantsBuffer);
 		sClusterCullPass->SetSSBO(1, sMainAndPostNodeAndClusterBatches);
 		sClusterCullPass->SetSSBO(2, sVisiableClusterSHWH, true);
+		sClusterCullPass->SetSSBO(3, sWorkArgsBuffer[0]);
+		sClusterCullPass->SetSSBO(4, sNaniteMesh);
 		sClusterCullPass->SetCS("Res/Shaders/ClusterCull.spv");
 		sClusterCullPass->SetComputeDispatchArgs(1, 1, 1);
 		sClusterCullPass->Build();
