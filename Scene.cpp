@@ -57,6 +57,7 @@ void InitScene(int inCanvasWidth, int inCanvasHeight) {
 	sGlobalConstantsData.SetProjectionMatrix(sProjectionMatrix.v);
 	sGlobalConstantsData.SetViewMatrix(sViewMatrix.v);
 	sGlobalConstantsData.SetModelMatrix(sModelMatrix.v);
+	sGlobalConstantsData.SetMisc0(0, 0, 0, 0);
 
 	float4 viewDirection = sCameraTargetPositionWS - sCameraPositionWS;
 	viewDirection.Normalize();
@@ -164,6 +165,20 @@ void InitScene(int inCanvasWidth, int inCanvasHeight) {
 		sClusterCullPass->Build();
 	}
 
+
+	//HWRasterize Pass
+	{
+		sHWRasterizePass = new RenderPass(ERenderPassType::ERPT_GRAPHICS, "HWRasterize");
+		sHWRasterizePass->SetUniformBufferObject(0, sGlobalConstantsBuffer);
+		sHWRasterizePass->SetSSBO(1, sNaniteMesh);
+		sHWRasterizePass->SetSSBO(2, sVisiableClusterSHWH);
+		sHWRasterizePass->SetSSBO(3, sVisBuffer64, true);
+		sHWRasterizePass->SetVSPS(
+			"Res/Shaders/HWRasterizeVS.spv", 
+			"Res/Shaders/HWRasterizeFS.spv");
+		sHWRasterizePass->Build(inCanvasWidth, inCanvasHeight);
+	}
+
 	//Visualize Pass
 	{
 		sVisualizePass = new RenderPass(ERenderPassType::ERPT_COMPUTE, "Visualize");
@@ -198,6 +213,7 @@ void InitScene(int inCanvasWidth, int inCanvasHeight) {
 		staticMesh->mMaterial.SetTexture2D(2, 0,sVisualizationTexture->mImageView, GenSampler());
 	}
 }
+
 void RenderOneFrame(float inFrameTimeInSecond) {
 	BufferSubData(sGlobalConstantsBuffer, &sGlobalConstantsData, sizeof(GlobalConstants));
 	sInitPass->Execute();
@@ -205,6 +221,7 @@ void RenderOneFrame(float inFrameTimeInSecond) {
 		sNodeAndClusterCullPass[i]->Execute();
 	}
 	sClusterCullPass->Execute();
+	sHWRasterizePass->ExecuteIndirect(sWorkArgsBuffer[0]);
 	sVisualizePass->Execute();
 	VkCommandBuffer commandBuffer = CreateCommandBuffer();
 	BeginCommandBuffer(commandBuffer, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
@@ -227,4 +244,29 @@ void RenderOneFrame(float inFrameTimeInSecond) {
 		sFSQNode->Draw(commandBuffer, GetSwapChainRenderPass(), sProjectionMatrix, sViewMatrix);
 	}
 	EndSwapChainRenderPass(commandBuffer);
+}
+
+void OnKeyUp(unsigned int inKeyCode)
+{
+	static int sCurrentMipLevelIndex = 0;
+	static int sAvaliableMipLevels[] = { 0 ,1, 2 ,3 ,4 ,5 ,6 ,7 ,8 ,9 ,10 };
+	if (inKeyCode == VK_UP)
+	{
+		printf("up arrow\n");
+		sCurrentMipLevelIndex++;
+		if (sCurrentMipLevelIndex == sizeof(sAvaliableMipLevels))
+		{
+			sCurrentMipLevelIndex = 0;
+		}
+	}
+	else if (inKeyCode == VK_DOWN)
+	{
+		printf("down arrow\n");
+		sCurrentMipLevelIndex--;
+		if (sCurrentMipLevelIndex < 0)
+		{
+			sCurrentMipLevelIndex = sizeof(sAvaliableMipLevels) - 1;
+		}
+	}
+	sGlobalConstantsData.SetMisc0(sAvaliableMipLevels[sCurrentMipLevelIndex], 0, 0, 0);
 }

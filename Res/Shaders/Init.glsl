@@ -16,20 +16,24 @@ layout(std430,binding=3)buffer FVisBuffer64{
     uint64_t mData[];
 }VisBuffer64;
 void main(){
-	ivec2 texcoord = ivec2(gl_GlobalInvocationID.xy);
-	if(any(greaterThanEqual(texcoord, ivec2(1280,720))))
-	{
-		return;
+	ivec2 texcoord=ivec2(gl_GlobalInvocationID.xy);
+	if(any(greaterThanEqual(texcoord,ivec2(1280,720)))){
+		return ;
 	}
-	if(texcoord.x == 0 && texcoord.y == 0)
-	{
+	if(texcoord.x==0&&texcoord.y==0){
+		WorkArgs0.mData[0]=384u;
+		WorkArgs0.mData[1]=0u;
+		WorkArgs0.mData[2]=0u;
+		WorkArgs0.mData[3]=0u;
 		WorkArgs0.mData[5]=0u;
 		WorkArgs0.mData[6]=1u;
-		WorkArgs0.mData[7]=0u;
+		WorkArgs1.mData[0]=384u;
+		WorkArgs1.mData[1]=0u;
+		WorkArgs1.mData[2]=0u;
+		WorkArgs1.mData[3]=0u;
 		WorkArgs1.mData[5]=0u;
 		WorkArgs1.mData[6]=1u;
-		WorkArgs1.mData[7]=0u;
 	}
-	int pixelIndex = texcoord.y*1280+texcoord.x;
-	VisBuffer64.mData[pixelIndex] = pixelIndex;
+	int pixelIndex=texcoord.y*1280+texcoord.x;
+	VisBuffer64.mData[pixelIndex]=pixelIndex;
 }

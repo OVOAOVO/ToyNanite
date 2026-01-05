@@ -15,6 +15,9 @@ LRESULT CALLBACK VulkanRenderWindowProc(HWND inHWND, UINT inMessage,
 	case WM_CLOSE:
 		PostQuitMessage(0);//WM_QUIT
 		break;
+	case WM_KEYUP:
+		OnKeyUp(inWParam);
+		break;
 	}
 	return DefWindowProc(inHWND, inMessage, inWParam, inLParam);
 }

@@ -27,6 +27,9 @@ layout(std430,binding=1)buffer FMainAndPostNodeAndClusterBatches{
 layout(std430,binding=2)buffer FVisibleClusterSHWH{
     uint mData[];
 }VisibleClusterSHWH;
+layout(std430,binding=3)buffer FWorkArgs0{
+    uint mData[];
+}WorkArgs0;
 uint BitFieldExtractU32(uint Data, uint Size, uint Offset)
 {
 	// Shift amounts are implicitly &31 in HLSL, so they should be optimized away on most platforms
