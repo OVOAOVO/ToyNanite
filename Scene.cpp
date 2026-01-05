@@ -130,7 +130,7 @@ void InitScene(int inCanvasWidth, int inCanvasHeight) {
 		sInitPass->SetSSBO(2, sMainAndPostNodeAndClusterBatches, true);
 		sInitPass->SetSSBO(3, sVisBuffer64, true);
 		sInitPass->SetCS("Res/Shaders/Init.spv");
-		sInitPass->SetComputeDispatchArgs(1, 1, 1);
+		sInitPass->SetComputeDispatchArgs(int(ceilf(float(inCanvasWidth) / 8.f)), int(ceilf(float(inCanvasHeight) / 8.f)), 1);
 		sInitPass->Build();
 	}
 
@@ -160,7 +160,7 @@ void InitScene(int inCanvasWidth, int inCanvasHeight) {
 		sVisualizePass->SetSSBO(0, sVisBuffer64);
 		sVisualizePass->SetComputeImage(1, sVisualizationTexture, true);
 		sVisualizePass->SetCS("Res/Shaders/Visualize.spv");
-		sVisualizePass->SetComputeDispatchArgs(1, 1, 1);
+		sVisualizePass->SetComputeDispatchArgs(int(ceilf(float(inCanvasWidth) / 8.f)), int(ceilf(float(inCanvasHeight) / 8.f)), 1);
 		sVisualizePass->Build();
 	}
 

@@ -1,6 +1,6 @@
 #version 450
 #extension GL_ARB_gpu_shader_int64 : enable
-layout(local_size_x=1,local_size_y=1,local_size_z=1)in;
+layout(local_size_x=8,local_size_y=8,local_size_z=1)in;
 
 layout(std430,binding=0)buffer FVisBuffer64{
     uint64_t mData[];
@@ -32,20 +32,21 @@ vec3 IntToColor(uint Index)
 }
 
 void main(){
-	for(int x = 0; x < 1280; x++)
+	ivec2 texcoord = ivec2(gl_GlobalInvocationID.xy);
+	if(any(greaterThanEqual(texcoord, ivec2(1280,720))))
 	{
-		for(int y = 0; y < 720 ; y++)
-		{
-			int pixelIndex = y*1280+x;
-			uint64_t pixelValue = VisBuffer64.mData[pixelIndex];// 32(depth) | 32( pageIndex | ClusterIndex)
-            uint packedClusterInfo = uint(pixelValue);
-            uint pageIndex = packedClusterInfo >> 8;
-            uint clusterIndex = packedClusterInfo & 0xFFu;
-
-            vec3 color = vec3(0.f, 0.f, 0.f);
-            color = IntToColor(clusterIndex);
-            color = color * 0.8 + 0.2;
-            imageStore(VisualizeTexture, ivec2(x,y), vec4(color, 1.f));
-		}
+		return;
 	}
+
+    int pixelIndex = texcoord.y*1280+texcoord.x;
+    uint64_t pixelValue = VisBuffer64.mData[pixelIndex];// 32(depth) | 32( pageIndex | ClusterIndex)
+    uint packedClusterInfo = uint(pixelValue);
+    uint pageIndex = packedClusterInfo >> 8;
+    uint clusterIndex = packedClusterInfo & 0xFFu;
+
+    vec3 color = vec3(0.f, 0.f, 0.f);
+    color = IntToColor(clusterIndex);
+    color = color * 0.8 + 0.2;
+    imageStore(VisualizeTexture, texcoord, vec4(color, 1.f));
+
 }
