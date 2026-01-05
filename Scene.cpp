@@ -8,12 +8,14 @@
 #include "SceneNode.h"
 #define _4MB 4194304
 
-static float sLODScale, sLODScaleHSW;
+static float sLODScale, sLODScaleHW;
 static float4 sCameraPositionWS(-330.f, 330.f, -330.f), sCameraTargetPositionWS(0.f, 80.f ,0.f);
 static matrix4 sProjectionMatrix, sViewMatrix, sModelMatrix;
 static GlobalConstants sGlobalConstantsData;
 
-static Buffer* sGlobalConstantsBuffer,* sBVHBuffer, *sEchoBuffer, *sWorkArgsBuffer[2], * sMainAndPostNodeAndClusterBatches;
+static Buffer* sGlobalConstantsBuffer,* sBVHBuffer, *sEchoBuffer, *sWorkArgsBuffer[2], * sMainAndPostNodeAndClusterBatches,
+				*sVisBuffer64, *sNaniteMesh, *sVisibleClusterSHWH;
+static Texture2D* sVisualizationTexture;
 static RenderPass* sInitPass, *sNodeAndClusterCullPass[4];
 
 unsigned char* LoadFileContent(const char* inFilePath, size_t& outFileSize) {
@@ -39,23 +41,44 @@ void InitScene(int inCanvasWidth, int inCanvasHeight) {
 	sModelMatrix.LoadIdentity();
 	sModelMatrix.SetLeftTop3x3(lt3x3);
 
+	float ViewToPixels = 0.5f * sProjectionMatrix.v[5] * float(inCanvasHeight);
+	sLODScale = ViewToPixels / 1.f;
+	sLODScaleHW = ViewToPixels / 32.f;
+
 	sGlobalConstantsData.SetProjectionMatrix(sProjectionMatrix.v);
 	sGlobalConstantsData.SetViewMatrix(sViewMatrix.v);
 	sGlobalConstantsData.SetModelMatrix(sModelMatrix.v);
 
 	float4 viewDirection = sCameraTargetPositionWS - sCameraPositionWS;
 	viewDirection.Normalize();
-	sGlobalConstantsData.SetCameraPositionWS(sCameraPositionWS.x, sCameraPositionWS.y, sCameraPositionWS.z, sCameraPositionWS.z);
-	sGlobalConstantsData.SetCameraViewDirectionWS(viewDirection.x, viewDirection.y, viewDirection.z, viewDirection.z);
+	sGlobalConstantsData.SetCameraPositionWS(sCameraPositionWS.x, sCameraPositionWS.y, sCameraPositionWS.z, sLODScale);
+	sGlobalConstantsData.SetCameraViewDirectionWS(viewDirection.x, viewDirection.y, viewDirection.z, sLODScaleHW);
 	
 	sGlobalConstantsBuffer = GenBufferObject(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
 		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, nullptr, 65536);
 	SetObjectName(VK_OBJECT_TYPE_BUFFER, sGlobalConstantsBuffer->mBuffer, "GlobalConstants");
 
+	{
+		sVisualizationTexture = new Texture2D;
+		sVisualizationTexture->mFormat = VK_FORMAT_R32G32B32A32_SFLOAT;
+		sVisualizationTexture->mImageAspectFlag = VK_IMAGE_ASPECT_COLOR_BIT;
+		GenImage(sVisualizationTexture, inCanvasWidth, inCanvasHeight,
+			VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, 
+			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+		sVisualizationTexture->mImageView = GenImageView2D(sVisualizationTexture->mImage, sVisualizationTexture->mFormat, sVisualizationTexture->mImageAspectFlag);
+		sVisualizationTexture->mWidth = inCanvasWidth;
+		sVisualizationTexture->mHeight = inCanvasHeight;
+		sVisualizationTexture->mChannelCount = 4;
+		SetObjectName(VK_OBJECT_TYPE_IMAGE, sVisualizationTexture->mImage, "VisualizationTexture");
+	}
 
 	sEchoBuffer = GenBufferObject(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
 		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, nullptr, _4MB);
 	SetObjectName(VK_OBJECT_TYPE_BUFFER, sEchoBuffer->mBuffer, "EchoBuffer");
+
+	sVisBuffer64 = GenBufferObject(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, nullptr, inCanvasWidth*inCanvasHeight*sizeof(uint64_t));
+	SetObjectName(VK_OBJECT_TYPE_BUFFER, sVisBuffer64->mBuffer, "VisBuffer64");
 
 	sWorkArgsBuffer[0] = GenBufferObject(
 		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,
@@ -71,10 +94,20 @@ void InitScene(int inCanvasWidth, int inCanvasHeight) {
 		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, nullptr, _4MB);
 	SetObjectName(VK_OBJECT_TYPE_BUFFER, sMainAndPostNodeAndClusterBatches->mBuffer, "MainAndPostNodeAndClusterBatches");
 	
+	sVisibleClusterSHWH = GenBufferObject(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, nullptr, _4MB);
+	SetObjectName(VK_OBJECT_TYPE_BUFFER, sVisibleClusterSHWH->mBuffer, "VisibleClusterSHWH");
+
 	{
 		size_t fileSize = 0;
 		unsigned char* fileContent = LoadFileContent("Res/mitsuba.bvh", fileSize);
 		sBVHBuffer = GenBufferObject(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, fileContent, fileSize);
+		delete[] fileContent;
+		SetObjectName(VK_OBJECT_TYPE_BUFFER, sBVHBuffer->mBuffer, "HierarchyBuffer");
+
+		fileContent = LoadFileContent("Res/mitsuba.nanitemesh", fileSize);
+		sNaniteMesh = GenBufferObject(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
 			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, fileContent, fileSize);
 		delete[] fileContent;
 		SetObjectName(VK_OBJECT_TYPE_BUFFER, sBVHBuffer->mBuffer, "HierarchyBuffer");
@@ -86,6 +119,7 @@ void InitScene(int inCanvasWidth, int inCanvasHeight) {
 		sInitPass->SetSSBO(0, sWorkArgsBuffer[0], true);
 		sInitPass->SetSSBO(1, sWorkArgsBuffer[1], true);
 		sInitPass->SetSSBO(2, sMainAndPostNodeAndClusterBatches, true);
+		sInitPass->SetSSBO(3, sVisBuffer64, true);
 		sInitPass->SetCS("Res/Shaders/Init.spv");
 		sInitPass->SetComputeDispatchArgs(1, 1, 1);
 		sInitPass->Build();
@@ -104,6 +138,7 @@ void InitScene(int inCanvasWidth, int inCanvasHeight) {
 		sNodeAndClusterCullPass[i]->SetSSBO(3, sWorkArgsBuffer[inputWorkArgsIndex]);
 		sNodeAndClusterCullPass[i]->SetSSBO(4, sWorkArgsBuffer[outputWorkArgsIndex], true);
 		sNodeAndClusterCullPass[i]->SetUniformBufferObject(5, sGlobalConstantsBuffer);
+		sNodeAndClusterCullPass[i]->SetSSBO(6, sNaniteMesh);
 		sNodeAndClusterCullPass[i]->SetCS("Res/Shaders/NodeAndClusterCull.spv");
 		sNodeAndClusterCullPass[i]->SetComputeDispatchArgs(1, 1, 1);
 		sNodeAndClusterCullPass[i]->Build();

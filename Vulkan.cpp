@@ -314,6 +314,7 @@ static bool InitVulkanLogicDevice() {
 	features2.features.tessellationShader = VK_TRUE;
 	features2.features.fillModeNonSolid = VK_TRUE;
 	features2.features.wideLines = VK_TRUE;
+	features2.features.shaderInt64 = VK_TRUE;
 	features2.features.fragmentStoresAndAtomics = VK_TRUE;
 	features2.pNext = &shaderAtomic64Features;
 
