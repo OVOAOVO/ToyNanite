@@ -17,7 +17,7 @@ static Buffer* sGlobalConstantsBuffer,* sBVHBuffer, *sEchoBuffer, *sWorkArgsBuff
 				*sVisBuffer64, *sNaniteMesh, *sVisibleClusterSHWH;
 static Texture2D* sVisualizationTexture;
 static RenderPass* sInitPass, *sNodeAndClusterCullPass[4];
-
+static SceneNode* sFSQNode;
 unsigned char* LoadFileContent(const char* inFilePath, size_t& outFileSize) {
 	FILE* file = nullptr;
 	errno_t err = fopen_s(&file, inFilePath, "rb");
@@ -33,6 +33,7 @@ unsigned char* LoadFileContent(const char* inFilePath, size_t& outFileSize) {
 	return fileContent;
 }
 void InitScene(int inCanvasWidth, int inCanvasHeight) {
+	StaticMesh::Init();
 	sProjectionMatrix.Perspective(90.f, float(inCanvasWidth) / float(inCanvasHeight), 10.f, 10000.f);
 	sViewMatrix.LookAt(sCameraPositionWS, sCameraTargetPositionWS, float4(0.f, 1.f, 0.f));
 	matrix3 scaleMatrix;
@@ -143,6 +144,30 @@ void InitScene(int inCanvasWidth, int inCanvasHeight) {
 		sNodeAndClusterCullPass[i]->SetComputeDispatchArgs(1, 1, 1);
 		sNodeAndClusterCullPass[i]->Build();
 	}
+
+	{
+		sFSQNode = new SceneNode;
+		StaticMesh* staticMesh = new StaticMesh;
+		staticMesh->SetVertexCount(4);
+
+		staticMesh->SetPosition(0, -1.f, -1.f, 0.f, 1.f);
+		staticMesh->SetTexcoord(0, 0.f, 0.f, 0.f, 0.f);
+
+		staticMesh->SetPosition(1, 1.f, -1.f, 0.f, 1.f);
+		staticMesh->SetTexcoord(1, 1.f, 0.f, 0.f, 0.f);
+
+		staticMesh->SetPosition(2, -1.f, 1.f, 0.f, 1.f);
+		staticMesh->SetTexcoord(2, 0.f, 1.f, 0.f, 0.f);
+
+		staticMesh->SetPosition(3, 1.f, 1.f, 0.f, 1.f);
+		staticMesh->SetTexcoord(3, 1.f, 1.f, 0.f, 0.f);
+
+		staticMesh->mVBO = GenBufferObject(VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, staticMesh->mVertexData, sizeof(StaticMeshVertexData) * 4);
+		sFSQNode->mStaticMesh = staticMesh;
+		staticMesh->mMaterial.Init("Res/Shaders/SwapChainVS.spv","Res/Shaders/SwapChainFS.spv");
+		staticMesh->mMaterial.mPrimitiveType = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
+		staticMesh->mMaterial.SetTexture2D(2, 0,sVisualizationTexture->mImageView, GenSampler());
+	}
 }
 void RenderOneFrame(float inFrameTimeInSecond) {
 	BufferSubData(sGlobalConstantsBuffer, &sGlobalConstantsData, sizeof(GlobalConstants));
@@ -153,9 +178,22 @@ void RenderOneFrame(float inFrameTimeInSecond) {
 	VkCommandBuffer commandBuffer = CreateCommandBuffer();
 	BeginCommandBuffer(commandBuffer, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 	{
+		static bool bIsConverted = false;
+		if (bIsConverted == false)
+		{
+			bIsConverted = true;
+			VkImageSubresourceRange imageSubresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT ,0,1,0,1 };
+			TransferImageLayout(commandBuffer, sVisualizationTexture->mImage, imageSubresourceRange,
+				VK_IMAGE_LAYOUT_UNDEFINED, VK_ACCESS_NONE,
+				VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+				VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_ACCESS_SHADER_READ_BIT,
+				VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
+		}
+
 		SCOPED_EVENT(commandBuffer, "SwapChain");
 		BeginSwapChainRenderPass(commandBuffer);
-		ShaderParameterDescription* parameterDescription = GetUberPassShaderParameterDescription();
+		//ShaderParameterDescription* parameterDescription = GetUberPassShaderParameterDescription();
+		sFSQNode->Draw(commandBuffer, GetSwapChainRenderPass(), sProjectionMatrix, sViewMatrix);
 	}
 	EndSwapChainRenderPass(commandBuffer);
 }
